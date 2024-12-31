@@ -23,10 +23,10 @@ piece_image_mapping = {
     'k': 'bking.png'
 }
 
-sPath = #path to engine
+sPath = #EnginePath
 engine = chess.engine.SimpleEngine.popen_uci(sPath)
 
-pgnFile = open(#path to files)
+pgnFile = open(#pgnPath)
 
 with pgnFile as gameFile:
     games = []
@@ -50,7 +50,7 @@ engine.configure({
     "UCI_Elo": 1320,
 })
 
-whiteOrBlack = random.randrange(0,1)
+whiteOrBlack = random.choice([0,1])
 
 class Board:
     def __init__(self, screen, size):
@@ -64,6 +64,7 @@ class Board:
         self.xPlane = ["a", "b", "c", "d", "e", "f", "g", "h"]
         self.yPlane = [8, 7, 6, 5, 4, 3, 2, 1]
         self.font = pygame.font.SysFont(pygame.font.get_default_font(), self.squareSize // 3)
+        self.piecesImages = self.loadPieces()
 
     def loadPieces(self):
         piecesImages = {} 
@@ -84,16 +85,16 @@ class Board:
                 fontImg = self.font.render(f"{self.xPlane[i]}{self.yPlane[j]}", True, (0, 0, 0))
                 self.screen.blit(fontImg, (i * self.squareSize, j * self.squareSize) )
 
-    def drawPieces(self, piecesImages):
+    def drawPieces(self):
         for square in chess.SQUARES:
             piece = self.board.piece_at(square)
             if piece:
                 pieceSymbol = piece.symbol()
-                self.screen.blit(piecesImages[pieceSymbol], (chess.square_file(square) * self.squareSize, (7 - chess.square_rank(square)) * self.squareSize))
+                self.screen.blit(self.piecesImages[pieceSymbol], (chess.square_file(square) * self.squareSize, (7 - chess.square_rank(square)) * self.squareSize))
 
     def draw(self):
         self.drawBoard()
-        self.drawPieces(self.loadPieces())
+        self.drawPieces()
 
     def update(self, toSquare:tuple, fromSquare:tuple):
         move = chess.Move(chess.square(fromSquare[0], 7 - fromSquare[1]),chess.square(toSquare[0], 7 - toSquare[1]))
@@ -103,8 +104,13 @@ class Board:
             self.WhiteToMove = False
 
     def engineMove(self):
-        if self.moveCounter < self.openingMoves:
-            self.board.push(gameMoves[self.moveCounter])
+        if self.moveCounter < self.openingMoves and self.moveCounter < len(gameMoves):
+            newMove = gameMoves[self.moveCounter]
+            if newMove in self.board.legal_moves:
+                self.board.push(newMove)
+            else:
+                newLegalMove = engine.play(self.board, chess.engine.Limit(time=0.1, depth=5))
+                self.board.push(newLegalMove.move)
             self.moveCounter += 1
             print(f"{self.moveCounter}: {gameMoves[self.moveCounter - 1]}")
             self.draw()
@@ -145,7 +151,11 @@ while True:
             board.WhiteToMove = True 
 
         if board.board.is_game_over():
+            print("Game Over!")
+            print(f"Result: {board.board.result()}")
             engine.quit()
+            pygame.quit()
+            exit()
 
     board.draw()
     pygame.display.flip()
